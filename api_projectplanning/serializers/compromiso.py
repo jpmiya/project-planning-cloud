@@ -11,7 +11,8 @@ class CompromisoSerializer(serializers.ModelSerializer):
             'id_ong_coolaboradora',
             'id_etapa_back', 
             'aporte', 
-            'es_total', 
+            'es_total',
+            'nombre_ong_coolaboradora',
             'cantidad',
             'fecha_compromiso',
             'cumplido'
