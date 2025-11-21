@@ -50,15 +50,15 @@ def authenticate_user(request):
             return JsonResponse({'error': 'Faltan credenciales'}, status=400)
 
         # Valida contra la tabla User de Django
-        #user = authenticate(username=username, password=password)
-        #if user is None:
+        user = authenticate(username=username, password=password)
+        if user is None:
             return JsonResponse({'error': 'Credenciales inválidas'}, status=401)
 
         # Si es válido → generar el token
         now = datetime.datetime.now(datetime.timezone.utc)
         payload = {
-            'id': 1,#user.id,
-            'username': username,#user.username,
+            'id': user.id,
+            'username': user.username,
             'exp': now + datetime.timedelta(hours=2),
             'iat': now
         }
@@ -67,9 +67,9 @@ def authenticate_user(request):
         return JsonResponse({
             'token': f'Bearer {token}',
             'user': {
-                'id': 1,#user.id,
-                'username': username,#user.username,
-                'email': "algo@mail.com"#user.email,
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
             }
         }, status=200)
 
