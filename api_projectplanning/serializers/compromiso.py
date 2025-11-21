@@ -51,6 +51,11 @@ class CompromisoSerializer(serializers.ModelSerializer):
 
 
 
-class CumplidoSerializer(serializers.Serializer):
+class CumplidoSerializerByCompromiso(serializers.Serializer):
     id_compromiso = serializers.IntegerField()
+    cumplido = serializers.BooleanField()
+    
+
+class CumplidoSerializerByEtapa(serializers.Serializer):
+    id_etapa = serializers.IntegerField()
     cumplido = serializers.BooleanField()

@@ -10,7 +10,7 @@ from api_core.settings import SECRET_KEY
 from api_projectplanning.decorators import require_jwt
 from api_projectplanning.serializers.etapa import EtapaSerializer
 from api_projectplanning.serializers.proyecto import ProyectoSerializer
-from api_projectplanning.serializers.compromiso import CompromisoSerializer, CumplidoSerializer
+from api_projectplanning.serializers.compromiso import CompromisoSerializer, CumplidoSerializerByCompromiso, CumplidoSerializerByEtapa
 from api_projectplanning.models.compromiso import Compromiso
 from api_projectplanning.models.proyecto import Project
 from api_projectplanning.models.etapa import Etapa
@@ -18,6 +18,7 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from django.db.models import F
 
 
 # Create your views here.
@@ -315,13 +316,13 @@ def save_compromiso(request):
 @api_view(['POST'])
 @csrf_exempt
 @require_jwt
-def mark_cumplido_fulfilled(request):
+def mark_cumplido_fulfilled_by_compromiso_id(request):
     try:
         payload = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({"error": "JSON inválido"}, status=400)
     
-    serializer = CumplidoSerializer(data=payload)
+    serializer = CumplidoSerializerByCompromiso(data=payload)
     if serializer.is_valid():
         id_compromiso = serializer.validated_data["id_compromiso"]
         cumplido = serializer.validated_data["cumplido"]
@@ -333,7 +334,17 @@ def mark_cumplido_fulfilled(request):
 
         compromiso.cumplido = cumplido
         compromiso.save()
-        return JsonResponse({"mensaje": "Estado de compromiso actualizado correctamente"}, status=200)
+        
+        
+        etapa = Etapa.objects.get(etapa_back_id=compromiso.etapa_back.etapa_back_id)
+        proyecto_id = etapa.proyecto_back.pk
+                
+        no_cumplidos = Etapa.objects.filter(proyecto_back__pk=proyecto_id, compromisos__cumplido=False)
+
+        etapas_cubiertas = not no_cumplidos.exists()
+        
+        
+        return JsonResponse({"etapas_cubiertas": etapas_cubiertas, "proyecto_id": proyecto_id, "mensaje": "Estado de compromiso actualizado correctamente"}, status=200)
 
     return JsonResponse(serializer.errors, status=400)
     """
@@ -342,7 +353,71 @@ def mark_cumplido_fulfilled(request):
     "cumplido": true
     }
     """
-  
+
+"""
+
+@swagger_auto_schema(
+    method='post',
+    manual_parameters=[
+        openapi.Parameter(
+            'Authorization',
+            in_=openapi.IN_HEADER,
+            description="Token JWT. Formato: Bearer <token>",
+            type=openapi.TYPE_STRING
+        )
+    ],
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['id_etapa', 'cumplido'],
+        properties={
+            'id_etapa': openapi.Schema(type=openapi.TYPE_INTEGER),
+            'cumplido': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+        }
+    ),
+    responses={200: "Estados actualizados", 404: "Compromisos no encontrados"}
+)
+@api_view(['POST'])
+@csrf_exempt
+@require_jwt
+def mark_cumplido_fulfilled_by_etapa_id(request):
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+    
+    serializer = CumplidoSerializerByEtapa(data=payload)
+    if serializer.is_valid():
+        id_etapa = serializer.validated_data["id_etapa"]
+        cumplido = serializer.validated_data["cumplido"]
+
+        try:
+            compromisos = Compromiso.objects.filter(etapa_back__etapa_back_id=id_etapa)
+        except Compromiso.DoesNotExist:
+            return JsonResponse({"error": "Compromisos no encontrados"}, status=404)
+
+        for compromiso in compromisos:
+            compromiso.cumplido = cumplido
+            compromiso.save()
+            
+        etapa = Etapa.objects.get(etapa_back_id=id_etapa)
+        proyecto_id = etapa.proyecto_back.pk
+        
+        no_cumplidos = Etapa.objects.filter(proyecto_back__pk=proyecto_id).filter(cumplido=False)
+        etapas_cubiertas = False
+            
+        if no_cumplidos == None:
+            etapas_cubiertas = True
+        
+        return JsonResponse({"etapas_cubiertas": etapas_cubiertas, "mensaje": "Estados de compromisos actualizados correctamente"}, status=200)
+
+    return JsonResponse(serializer.errors, status=400)
+    
+    #{
+    #"id_etapa": 1,
+    #"cumplido": true
+    #}
+    """
+
   
 @swagger_auto_schema(
     method='get',
